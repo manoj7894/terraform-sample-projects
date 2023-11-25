@@ -1,7 +1,7 @@
 # To create S3 bucket with algoritham encryption
 # To create S3 bucket
 resource "aws_s3_bucket" "my_bucket" {
-  bucket = "manoj-90965"
+  bucket = "manoj-9143"
   acl    = "private" # Set the ACL to private for restricted access
   versioning {
     enabled = true
