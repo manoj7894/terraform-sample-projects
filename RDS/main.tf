@@ -172,7 +172,48 @@ resource "aws_security_group" "example_security_group" {
   }
 }
 
-# To get the AMI id 
+# To create IAM user-1
+resource "aws_iam_user" "example_user1" {
+  name = "node_user1"
+}
+
+# To create Login profile for user-1
+resource "aws_iam_user_login_profile" "example_user1_login_profile" {
+  user                    = aws_iam_user.example_user1.name
+  password_reset_required = true
+  password_length         = 12 # Set your desired password length
+}
+
+# To create IAM user ChangePasswordPolicy for user-1
+resource "aws_iam_user_policy" "example_user_policy" {
+  name       = "ChangePasswordPolicy"
+  user       = aws_iam_user.example_user1.name
+  policy     = <<-EOF
+{
+  "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "iam:ChangePassword"
+            ],
+            "Resource": [
+                "arn:aws:iam::*:user/node_user1"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "iam:GetAccountPasswordPolicy"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+  EOF
+}
+
+# To get the AMI id
 data "aws_caller_identity" "current" {}
 
 # To create the KMS key
@@ -206,8 +247,7 @@ resource "aws_kms_key" "my_kms_key" {
             "Effect": "Allow",
             "Principal": {
                 "AWS": [
-                    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/terraform",
-                    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/terraform-2"
+                    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/node_user1"
                 ]
             },
             "Action": [
@@ -224,8 +264,7 @@ resource "aws_kms_key" "my_kms_key" {
             "Effect": "Allow",
             "Principal": {
                 "AWS": [
-                    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/terraform",
-                    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/terraform-2"
+                    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/node_user1"
                 ]
             },
             "Action": [

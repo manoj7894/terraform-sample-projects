@@ -7,5 +7,6 @@ output "key_id" {
 }
 
 output "example" {
-  value = jsondecode(aws_secretsmanager_secret_version.example_secret_version.secret_string)["username"]
+  value     = aws_secretsmanager_secret_version.example_secret_version.secret_string
+  sensitive = true
 }

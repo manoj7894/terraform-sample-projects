@@ -6,7 +6,7 @@ resource "aws_instance" "example_instance" {
   associate_public_ip_address = true         # Enable a public IP
   key_name                    = var.key_name # Change to your key pair name
   availability_zone           = var.availability_zone
-  user_data                   = filebase64("/home/ec2-user/file.sh")
+  user_data                   = filebase64("/home/ec2-user/RDS/file.sh")
   vpc_security_group_ids      = [aws_security_group.example_security_group.id]
 
   tags = {
@@ -16,7 +16,7 @@ resource "aws_instance" "example_instance" {
 
 # To create db subnet group for RDS
 resource "aws_db_subnet_group" "mydb_subnet_group" {
-  name        = "mydb-subnet-group"
+  name        = "mydb-subnet-group2"
   description = "My RDS Subnet Group"
   subnet_ids  = [aws_subnet.public.id, aws_subnet.private.id] # Replace with your subnet IDs
 }
@@ -43,18 +43,22 @@ resource "aws_db_instance" "mydb" {
   db_name           = "bulepalrds"               # Set your desired database name
 }
 
-# To create the secret managner
-resource "aws_secretsmanager_secret" "example_secret" {
-  name = "db-sham"
+resource "aws_secretsmanager_secret" "example" {
+  name = "example-db-secret"
 }
 
-# To store the RDS data  credentials
-resource "aws_secretsmanager_secret_version" "example_secret_version" {
-  secret_id = aws_secretsmanager_secret.example_secret.id
+resource "aws_secretsmanager_secret_version" "example" {
+  secret_id = aws_secretsmanager_secret.example.id
   secret_string = jsonencode({
-    username = "dbuser",     # RDS username
-    password = "dbpassword", # RDS password
+    username = aws_db_instance.mydb.username
+    password = aws_db_instance.mydb.password
+    endpoint = aws_db_instance.mydb.endpoint
+    port     = aws_db_instance.mydb.port
   })
 }
+
+
+
+
 
 
