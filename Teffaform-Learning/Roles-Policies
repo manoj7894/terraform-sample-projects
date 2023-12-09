@@ -1,0 +1,486 @@
+# ECS
+policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+
+#EKS
+policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+
+#Lambda
+policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+
+
+
+
+# To create IAM user-2
+resource "aws_iam_user" "example_user2" {
+  name = "node_user2"
+}
+
+# To create Login profile for user-1
+resource "aws_iam_user_login_profile" "example_user1_login_profile" {
+  user                    = aws_iam_user.example_user1.name
+  password_reset_required = true
+  password_length         = 12 # Set your desired password length
+}
+
+# Attach the IAM Password Policy to IAM user
+resource "aws_iam_user_policy" "example_user_policy" {
+  name       = "ChangePasswordPolicy"
+  user       = aws_iam_user.example_user1.name
+  policy     = <<-EOF
+{
+  "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "iam:ChangePassword"
+            ],
+            "Resource": [
+                "arn:aws:iam::*:user/node_user1"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "iam:GetAccountPasswordPolicy"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+  EOF
+}
+
+# To create the IAM role1
+resource "aws_iam_role" "example" {
+  name               = var.ecs_task_execution_role
+  assume_role_policy = data.aws_iam_policy_document.assume_role.json
+}
+
+# To attach the policy to IAM role1
+resource "aws_iam_role_policy_attachment" "example-AmazonEKSClusterPolicy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+  role       = aws_iam_role.example.name
+}
+
+# To create IAM ec2 policy role
+resource "aws_iam_role" "example" {
+  name = "example-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Action = "sts:AssumeRole",
+        Effect = "Allow",
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+# To create ec2 role and policy
+resource "aws_iam_role" "eks_node_role" {
+  name = "eks-node-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Action = "sts:AssumeRole",
+        Effect = "Allow",
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+# To create ECS policy documenent
+data "aws_iam_policy_document" "assume_role" {
+  version = "2012-10-17"
+  statement {
+    sid     = ""
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["ecs-tasks.amazonaws.com"]
+    }
+  }
+}
+
+# To create EKS policy documenent
+data "aws_iam_policy_document" "assume_role" {
+  statement {
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["eks.amazonaws.com"]
+    }
+
+    actions = ["sts:AssumeRole"]
+  }
+}
+
+# To create lambda role and policy
+resource "aws_iam_role" "lambda_execution_role" {
+  name = "lambda_execution_role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Action = "sts:AssumeRole",
+        Effect = "Allow",
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        },
+      },
+    ],
+  })
+}
+
+
+# To create the lambda role and policy along with read access to permission to secret resource to see
+resource "aws_iam_role" "lambda_execution_role" {
+  name = "lambda_execution_role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Action = "sts:AssumeRole",
+        Effect = "Allow",
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        },
+      },
+      {
+        "Effect": "Allow",
+        "Principal": {
+          "Service": "secretsmanager.amazonaws.com"
+        },
+        "Action": [
+		    "secretsmanager:GetResourcePolicy",
+			  "secretsmanager:GetSecretValue",
+			  "secretsmanager:DescribeSecret",
+			  "secretsmanager:ListSecretVersionIds"
+	    ],
+        "Resource": "${aws_secretsmanager_secret.example_secret.arn}"
+       }
+    ],
+  })
+}
+
+# To create cloud role and policy for cloud watch
+resource "aws_iam_policy" "lambda_policy" {
+  name        = "MyLambdaPolicy" # Name for the policy
+  description = "Policy for My Lambda Function"
+
+  # Define the policy document with the necessary permissions
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+        Effect   = "Allow",
+        Resource = "arn:aws:logs:*:*:*"
+      }
+    ]
+  })
+}
+
+# Attach S3 bucket policy to IAM user
+resource "aws_iam_user_policy" "s3_full_access_policy1" {
+  name = "s3_full_access_policy"
+  user = aws_iam_user.example_user1.name
+
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "s3:*",
+      "Resource": "*"
+    }
+  ]
+}
+EOF
+}
+
+# To create the load balance listener rule for target group-1
+resource "aws_lb_listener_rule" "example_rule_1" {
+  listener_arn = aws_lb_listener.example.arn
+  priority     = 100
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.example_target_group.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/app1"]
+    }
+  }
+}
+
+# TO get full s3 service access
+{
+    	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "VisualEditor0",
+			"Effect": "Allow",
+			"Action": "s3:*",
+			"Resource": "*"
+		}
+	]
+}
+
+
+# TO see the Only Lift of Buckets
+{
+    	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "VisualEditor0",
+			"Effect": "Allow",
+			"Action": "s3:ListAllMyBuckets",
+			"Resource": "*"
+		}
+	]
+}
+
+
+# To see only Particular Bucket
+{
+    "Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "VisualEditor0",
+			"Effect": "Allow",
+			"Action": "s3:ListBucket",
+			"Resource": "arn:aws:s3:::manoj-3058"
+		}
+	]
+}
+
+
+# To see only below two buckets
+{
+    "Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "VisualEditor0",
+			"Effect": "Allow",
+			"Action": "s3:ListBucket",
+			"Resource": ["arn:aws:s3:::manoj-3058", "arn:aws:s3:::kubernets-3003"]
+		}
+	]
+}
+
+
+# To get the fullaccess
+{
+    "Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "VisualEditor0",
+			"Effect": "Allow",
+			"Action": "sts:AssumeRole",
+			"Resource": "*"
+		}
+	]
+}
+
+
+
+resource "aws_kms_key" "my_kms_key" {
+  description              = "My KMS Keys for Data Encryption"
+  customer_master_key_spec = var.key_spec         #SYMMETRIC_DEFAULT
+  is_enabled               = var.enabled          # true
+  enable_key_rotation      = var.rotation_enabled # true
+  deletion_window_in_days  = 7
+
+  tags = {
+    Name = "my_kms_key"
+  }
+
+  policy = <<POLICY
+{
+    "Id": "key-consolepolicy-3",
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "Enable IAM User Permissions",
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+            },
+            "Action": "kms:*",
+            "Resource": "*"
+        },
+        {
+            "Sid": "Allow use of the key",
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": [
+                    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/node_user1"
+                ]
+            },
+            "Action": [
+                "kms:Encrypt"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "Allow use of the key by node_user2",
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": [
+                    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/node_user2"
+                ]
+            },
+            "Action": [
+                "kms:Decrypt"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "Allow attachment of persistent resources",
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": [
+                    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/node_user1",
+                    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/node_user2"
+                ]
+            },
+            "Action": [
+                "kms:CreateGrant",
+                "kms:ListGrants",
+                "kms:RevokeGrant"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "Bool": {
+                    "kms:GrantIsForAWSResource": "true"
+                }
+            }
+        }
+    ]
+}
+
+
+
+
+
+
+
+# To work
+
+{
+  "Version": "2012-10-17",
+  "Id": "Key policy created by CloudTrail",
+  "Statement": [
+      {
+          "Sid": "Enable IAM User Permissions",
+          "Effect": "Allow",
+          "Principal": {
+              "AWS": "arn:aws:iam::254669244016:root"
+          },
+          "Action": "kms:*",
+          "Resource": "*"
+      },
+      {
+          "Sid": "Allow CloudTrail to encrypt logs",
+          "Effect": "Allow",
+          "Principal": {
+              "Service": "cloudtrail.amazonaws.com"
+          },
+          "Action": "kms:GenerateDataKey*",
+          "Resource": "*",
+          "Condition": {
+              "StringEquals": {
+                  "AWS:SourceArn": "arn:aws:cloudtrail:ap-south-1:254669244016:trail/Trail-123"
+              },
+              "StringLike": {
+                  "kms:EncryptionContext:aws:cloudtrail:arn": "arn:aws:cloudtrail:*:254669244016:trail/*"
+              }
+          }
+      },
+      {
+          "Sid": "Allow CloudTrail to describe key",
+          "Effect": "Allow",
+          "Principal": {
+              "Service": "cloudtrail.amazonaws.com"
+          },
+          "Action": "kms:DescribeKey",
+          "Resource": "*"
+      },
+      {
+          "Sid": "Allow principals in the account to decrypt log files",
+          "Effect": "Allow",
+          "Principal": {
+              "AWS": "*"
+          },
+          "Action": [
+              "kms:Decrypt",
+              "kms:ReEncryptFrom"
+          ],
+          "Resource": "*",
+          "Condition": {
+              "StringEquals": {
+                  "kms:CallerAccount": "254669244016"
+              },
+              "StringLike": {
+                  "kms:EncryptionContext:aws:cloudtrail:arn": "arn:aws:cloudtrail:*:254669244016:trail/*"
+              }
+          }
+      },
+      {
+          "Sid": "Allow alias creation during setup",
+          "Effect": "Allow",
+          "Principal": {
+              "AWS": "*"
+          },
+          "Action": "kms:CreateAlias",
+          "Resource": "*",
+          "Condition": {
+              "StringEquals": {
+                  "kms:ViaService": "ec2.ap-south-1.amazonaws.com",
+                  "kms:CallerAccount": "254669244016"
+              }
+          }
+      },
+      {
+          "Sid": "Enable cross account log decryption",
+          "Effect": "Allow",
+          "Principal": {
+              "AWS": "*"
+          },
+          "Action": [
+              "kms:Decrypt",
+              "kms:ReEncryptFrom"
+          ],
+          "Resource": "*",
+          "Condition": {
+              "StringEquals": {
+                  "kms:CallerAccount": "254669244016"
+              },
+              "StringLike": {
+                  "kms:EncryptionContext:aws:cloudtrail:arn": "arn:aws:cloudtrail:*:254669244016:trail/*"
+              }
+          }
+      }
+  ]
+}

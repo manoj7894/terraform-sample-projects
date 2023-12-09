@@ -1,0 +1,153 @@
+user_data              = filebase64("/home/ec2-user/ami/file.sh")   --> To get the file from local 
+
+script_version         = filebase64("./build.sh")  --> To get the file from Visual Studio code
+
+vpc_security_group_ids = [aws_security_group.example_security_group.id]
+
+value                  = [aws_instance.first.public_ip, aws_instance.second.public_ip]
+
+subnets                = [aws_subnet.public.id, aws_subnet.private.id]
+
+subnet_ids             = [aws_subnet.public.id, aws_subnet.private.id]
+
+subnet_id              = aws_subnet.public.id
+
+vpc_zone_identifier    = [aws_subnet.public.id, aws_subnet.private.id]
+
+command                = "docker build -t ${var.DOCKER_USERNAME}/${var.IMAGE_NAME}:latest ."   --> To build the docker image
+
+command                = "docker login -u ${var.DOCKER_USERNAME} -p ${var.DOCKER_PASSWORD}"   --> To login into dockerhub
+
+command                = "docker push ${var.DOCKER_USERNAME}/${var.IMAGE_NAME}:latest"        --> To push docker image to Dockerhub
+
+"image" : "docker.io/${var.DOCKER_USERNAME}/${var.IMAGE_NAME}:latest",         --> To push docker image to ECR
+
+depends_on = [aws_alb_listener.example, data.aws_iam_policy_document.assume_role]  --> To depends on Aonther resource
+
+resource_id        = "service/${aws_ecs_cluster.my_cluster.name}/${aws_ecs_service.example.name}"  --> To take reference from two different resources
+
+cluster         = aws_ecs_cluster.my_cluster.id   --> To get the id
+
+task_definition = aws_ecs_task_definition.my_task.arn   --> To get the arn 
+
+name = aws_launch_configuration.example.name   --> To get the name
+
+scalable_dimension = aws_appautoscaling_target.ecs_target.scalable_dimension  --> To take reference from name into side the resource
+
+volume_id = aws_instance.first.root_block_device[0].volume_id
+
+count         = var.stop_instance ? 1 : 0 # Conditionally stop the instance based on a variable
+
+instance_id = aws_instance.stop_instance[0].id
+
+Name = "Example-Instance-${count.index}"
+
+policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+
+source_file = "/home/ec2-user/index.js"    
+
+output_path = "${path.module}/index.zip"
+
+filename = data.archive_file.lambda_package1.output_path   --> To get the file from file into resource
+
+source_code_hash = data.archive_file.lambda_package1.output_base64sha256
+
+uri                     = aws_lambda_function.html_lambda.invoke_arn    --> To get the URL
+
+source_arn    = "arn:aws:execute-api:${var.region}:${data.aws_caller_identity.current.account_id}:${aws_api_gateway_rest_api.my_api.id}/*/${aws_api_gateway_method.my_method.http_method}${aws_api_gateway_resource.my_resource.path}"
+
+"Principal": {
+                "AWS": "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+            },
+
+policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaSQSQueueExecutionRole"
+
+key            = "global/mystate/file.txt"   --> Path in s3 bucket
+
+source       = "/home/ec2-user/file.txt"  # Path to the local file you want to upload
+
+instances     = ["${aws_instance.first.id}", "${aws_instance.second.id}"]   --> Attach two instances in one resource
+
+policy_arns = ["arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy", "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"]
+
+role_arns = ["aws_iam_role.example.arn", "aws_iam_role.raja.arn"]
+
+
+
+# Availability_Zones
+variable "availability_zones" {
+  type    = list(string)
+  default = ["us-east-1a", "us-east-1b"]  # Adjust with your desired Availability Zones
+}
+
+resource "aws_subnet" "public_subnet" {
+  count = length(var.availability_zones)
+
+  vpc_id                  = aws_vpc.example_vpc.id
+  cidr_block              = "10.0.${count.index + 1}.0/24"
+  availability_zone       = element(var.availability_zones, count.index)
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = "public-subnet-${count.index + 1}"
+  }
+}
+
+resource "aws_subnet" "private_subnet" {
+  count = length(var.availability_zones)
+
+  vpc_id                  = aws_vpc.example_vpc.id
+  cidr_block              = "10.0.${count.index + 3}.0/24"  # Adjust with your desired private subnet CIDR block
+  availability_zone       = element(var.availability_zones, count.index)
+
+  tags = {
+    Name = "private-subnet-${count.index + 1}"
+  }
+}
+
+
+variable "availability_zones" {
+  type    = list(string)
+  default = ["ap-south-1a", "ap-south-1b"]  # Adjust with your desired Availability Zones
+}
+
+resource "aws_subnet" "public_subnet" {
+  count = length(var.availability_zones)
+
+  vpc_id                  = aws_vpc.example_vpc.id
+  cidr_block              = "10.0.${count.index + 1}.0/24"
+  availability_zone       = element(var.availability_zones, count.index)
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = "public-subnet-${count.index + 1}"
+  }
+}
+
+
+# To create the Ec2 instance
+resource "aws_instance" "example_instance" {
+  ami                         = var.ami           # Change to your desired AMI ID
+  instance_type               = var.instance_type # Change to your desired instance type
+  subnet_id           = aws_subnet.public_subnet[count.index].id  # Use the correct subnet for the current index
+  associate_public_ip_address = true         # Enable a public IP
+  key_name                    = var.key_name # Change to your key pair name
+  count                       = length(var.availability_zones) * var.instance_count
+  availability_zone           = element(var.availability_zones, count.index % length(var.availability_zones))
+  vpc_security_group_ids      = [aws_security_group.example_security_group.id]
+  #user_data = <<-EOF
+  #!/bin/bash
+  #sudo echo "Hello from user data!" > /tmp/file123.txt
+  # You can put any shell script or commands here
+  #EOF
+
+  root_block_device {
+    volume_size = 10
+    volume_type = "gp2"
+  }
+
+  tags = {
+    Name = "example-instance-${count.index + 1}"
+  }
+}
+
