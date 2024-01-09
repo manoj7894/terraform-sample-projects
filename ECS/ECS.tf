@@ -22,13 +22,21 @@ resource "aws_ecs_task_definition" "my_task" {
           "containerPort" : 80,
           "hostPort" : 80
         }
-      ]
+      ],
       "mount_points" : [
         {
           "container_path" : "home/ec2-user/var/lib/docker/volumes",
           "source_volume" : "volume-name"
         }
-      ]
+      ],
+      "logConfiguration":{
+            "logDriver":"awslogs",
+            "options":{
+               "awslogs-group":"awslogs-nginx-ecs",
+               "awslogs-region":"ap-south-1",
+               "awslogs-stream-prefix":"ecs"
+            }
+      }
     }
   ])
 }
