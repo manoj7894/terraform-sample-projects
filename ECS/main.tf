@@ -145,10 +145,38 @@ data "aws_iam_policy_document" "assume_role" {
   }
 }
 
+resource "aws_cloudwatch_log_group" "ECS_log_group" {
+  name              = "awslogs-nginx-ecs" # Adjust the name to match your Lambda function's name
+  retention_in_days = 14
+}
+
+resource "aws_iam_policy" "ECS_policy" {
+  name        = "MyECSPolicy" # Name for the policy
+  description = "Policy for My Lambda Function"
+
+  # Define the policy document with the necessary permissions
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+        Effect   = "Allow",
+        Resource = "arn:aws:logs:*:*:*"
+      }
+    ]
+  })
+}
+
+
 # To create the IAM role1
 resource "aws_iam_role" "example" {
   name               = var.ecs_task_execution_role
   assume_role_policy = data.aws_iam_policy_document.assume_role.json
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_execution_role_policy_attachment" {
+  policy_arn = aws_iam_policy.ECS_policy.arn
+  role       = aws_iam_role.example.name
 }
 
 # ECS task execution role policy attachment
