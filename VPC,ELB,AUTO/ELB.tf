@@ -42,10 +42,9 @@ resource "aws_lb_listener" "example" {
       status_code  = "200"
     }
   }
-
 }
 
-# To create the load balance listener rule for target group-1
+# To create the listener rule for target group-1
 resource "aws_lb_listener_rule" "example_rule_1" {
   listener_arn = aws_lb_listener.example.arn
   priority     = 100
